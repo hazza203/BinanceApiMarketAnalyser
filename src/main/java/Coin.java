@@ -28,9 +28,9 @@ public class Coin {
         sma7day = new ArrayList();
     }
 
-    public double addPrice(Double price, Double bid, Double ask, boolean condition){
+    public double addPrice(Double price){
 
-        tradable = condition;
+
         this.bid = bid;
         this.ask = ask;
         last12.add(price);

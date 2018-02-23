@@ -31,6 +31,17 @@ public class AnalyseMarkets {
         coins = new HashMap();
     }
 
+
+    /**
+     Get all BTC pairs from binance API and store create a Coin class instances for
+     each and store in an HashMap of type Coin.
+
+     Once initialised the HashMap get the historical data for each Coin from the CryptoCompare
+     API to begin analyses and ensure we have enough data to begin analysis.
+
+     Begin getting live price data at specified intervals.
+     **/
+
     public void init(){
 
 
@@ -42,20 +53,20 @@ public class AnalyseMarkets {
 
             for (int i = 0; i < resultArray.length(); i++) {
                 JSONObject marketObj = resultArray.getJSONObject(i);
-                if (marketObj.getString("MarketName").contains("BTC-")) {
-                    coins.put(i, new Coin(marketObj.getString("MarketName")));
+                if (marketObj.getString("symbol").contains("BTC")) {
+                    coins.put(numCoins, new Coin(marketObj.getString("MarketName")));
                     numCoins++;
                 }
             }
         }
 
         for(int i = 0; i < numCoins; i++){
-            String ccName = coins.get(i).getName().replaceAll("BTC-","");
+            String ccName = coins.get(i).getName().replaceAll("BTC","");
             JSONArray ccArray = getCCJSON(ccName);
             for(int j = 0; j < ccArray.length(); j++){
                 JSONObject price = ccArray.getJSONObject(j);
                 double lastPrice = price.getDouble("close");
-                coins.get(j).addPrice(lastPrice, Double.NaN, Double.NaN, false);
+                coins.get(i).addPrice(lastPrice);
             }
         }
 
@@ -64,91 +75,53 @@ public class AnalyseMarkets {
 
     private void analyseMarkets(){
 
-        final Runnable printReport = new Runnable() {
-
-            public void run() {
-                System.out.println("---------- REPORT FOR PERIOD " + day + "----------");
-                System.out.println("Total Profit/Loss = " + profit);
-                System.out.println("Average Profit/Loss = " + profit/totalSold);
-                System.out.println("-------------------------------------");
-                System.out.println("Coins Bought today = " + coinsBought);
-                System.out.println("Coins sold today = " + coinsSold);
-                System.out.println("Coins still Hodl = " + coinsHodl);
-                System.out.println("-------------------------------------");
-                System.out.println("Profit/Loss for day =  " + dayProfit);
-                System.out.println("Average Profit/Loss for day = " + dayProfit/coinsSold);
-                System.out.println("-------------------------------------");
-                System.out.println("Average Profit = " + averageProf/soldProf);
-                System.out.println("Coins sold with Profit = " + soldProf);
-                System.out.println("Biggest Profit = " + highProf);
-                System.out.println("-------------------------------------");
-                System.out.println("Average Loss = " + averageLoss/soldLoss);
-                System.out.println("Coins sold with Loss = " + soldLoss);
-                System.out.println("Biggest Loss = " + highLoss);
-                System.out.println("-------------------------------------");
-                System.out.println("");
-
-                day++;
-                dayProfit = 0; coinsSold = 0; coinsBought = 0; highLoss = 0; highProf = 0; soldLoss = 0; soldProf = 0; averageLoss = 0; averageProf = 0;
-
-            }
-        };
-
         final Runnable gatherData = new Runnable() {
 
             public void run() {
 
                 JSONArray resultArray = getMarketJson();
 
-                outer:
-                for(int j = 0; j < numCoins; j++){
-                    JSONObject marketObj = resultArray.getJSONObject(j);
-                    for(int k = 0; k < numCoins; k++){
-                        if(marketObj.getString("MarketName").equalsIgnoreCase(coins.get(k).getName())){
-
-                            gained = coins.get(k).addPrice(marketObj.getDouble("Last"), marketObj.getDouble("Bid"), marketObj.getDouble("Ask"), true);
-
-                            if(!Double.isNaN(gained)){
-                                if(gained > 100.0){
-                                    coinsBought++;
-                                    coinsHodl++;
-                                } else {
-                                    coinsHodl--;
-                                    profit += gained;
-                                    dayProfit += gained;
-                                    coinsSold++;
-                                    totalSold++;
-                                    if(gained < 0.00000000){
-                                        if(gained < highLoss){
-                                            highLoss = gained;
-                                        }
-                                        soldLoss++;
-                                        averageLoss += gained;
-                                    } else {
-                                        if(gained > highProf){
-                                            highProf = gained;
-                                        }
-                                        soldProf++;
-                                        averageProf += gained;
-                                    }
-                                }
-
-                            }
-                            continue outer;
-                        }
-                    }
+                for(int i = 0; i < numCoins; i++){
+                    gained = coins.get(i).addPrice(getPrice(coins.get(i).getName()));
                 }
             }
         };
 
         final ScheduledFuture<?> dataHandler = scheduler.scheduleAtFixedRate(gatherData, 72, 72, TimeUnit.HOURS);
-        final ScheduledFuture<?> reportHandler = scheduler.scheduleAtFixedRate(printReport, 72, 72, TimeUnit.HOURS);
-
     }
+
+
+    private Double getPrice(String name){
+        JSONObject obj = null;
+
+        try{
+            URL url = new URL("https://api.binance.com/api/v3/ticker/price?symbol="+name);
+            URLConnection urlConnection = url.openConnection();
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
+
+            StringBuilder response = new StringBuilder();
+            String line;
+            while((line = bufferedReader.readLine()) != null){
+                response.append(line);
+            }
+
+            bufferedReader.close();
+
+            obj = new JSONObject(response.toString());
+            return obj.getDouble("price");
+
+        } catch (IOException e){
+            System.out.println("IO EXCEPTION IN GETPRICE METHOD: JSON CODE: " + obj.getString("code") );
+        }
+
+        return null;
+    }
+
+
 
     private JSONArray getMarketJson(){
         try{
-            URL url = new URL("https://bittrex.com/api/v1.1/public/getmarketsummaries");
+            URL url = new URL("https://api.binance.com/api/v3/ticker/price");
             URLConnection urlConnection = url.openConnection();
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream(), "UTF8"));
 
@@ -160,14 +133,8 @@ public class AnalyseMarkets {
 
             bufferedReader.close();
 
-            JSONObject obj = new JSONObject(response.toString());
-            Boolean success = obj.getBoolean("success");
-            if(success) {
-                JSONArray resultArray = obj.getJSONArray("result");
-                return resultArray;
-            } else {
-                return null;
-            }
+            JSONArray obj = new JSONArray(response.toString());
+            return obj;
         } catch (IOException e){
 
             System.out.println("ERROR getting JSON: " + e.getMessage());
