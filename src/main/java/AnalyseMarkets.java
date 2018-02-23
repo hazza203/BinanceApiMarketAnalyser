@@ -17,14 +17,10 @@ import java.util.concurrent.TimeUnit;
  */
 public class AnalyseMarkets {
 
-    String dataURL = "https://bittrex.com/api/v1.1/public/getmarketsummary?market=";
+
 
     HashMap<Integer, Coin> coins;
-    int numCoins = 0;
-    double profit, dayProfit;
-    double gained;
-    int coinsBought = 0, coinsHodl = 0, coinsSold = 0, soldLoss = 0, soldProf = 0, day = 1, totalSold = 0, dayCounter = 0;
-    double averageLoss = 0, averageProf = 0, highProf = 0, highLoss = 0;
+    int numCoins = 0, iter = 1;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public AnalyseMarkets(){
@@ -54,7 +50,7 @@ public class AnalyseMarkets {
             for (int i = 0; i < resultArray.length(); i++) {
                 JSONObject marketObj = resultArray.getJSONObject(i);
                 if (marketObj.getString("symbol").contains("BTC")) {
-                    coins.put(numCoins, new Coin(marketObj.getString("MarketName")));
+                    coins.put(numCoins, new Coin(marketObj.getString("symbol")));
                     numCoins++;
                 }
             }
@@ -73,6 +69,8 @@ public class AnalyseMarkets {
         analyseMarkets();
     }
 
+
+    //Gets new price data every specified period and feeds it into the Coin class for analysing.
     private void analyseMarkets(){
 
         final Runnable gatherData = new Runnable() {
@@ -80,16 +78,27 @@ public class AnalyseMarkets {
             public void run() {
 
                 JSONArray resultArray = getMarketJson();
-
+                System.out.println("Iteration #" + iter);
+                iter++;
                 for(int i = 0; i < numCoins; i++){
-                    gained = coins.get(i).addPrice(getPrice(coins.get(i).getName()));
+                    coins.get(i).addPrice(getPrice(coins.get(i).getName()));
                 }
             }
         };
 
-        final ScheduledFuture<?> dataHandler = scheduler.scheduleAtFixedRate(gatherData, 72, 72, TimeUnit.HOURS);
+        final ScheduledFuture<?> dataHandler = scheduler.scheduleAtFixedRate(gatherData, 5, 5, TimeUnit.MINUTES);
     }
 
+    /*
+
+        FROM HERE ON IT IS JUST METHODS FOR GETTING JSON TYPE API DATA
+
+        FIRST METHOD FOR BINANCE API TICKER, ONE FOR EACH COIN (Use this to avoid searching over in the second method)
+        SECOND METHOD FOR BINANCE API TICKER FOR ALL COINS (Use this to initialize the coin data structure)
+        THIRD METHOD FOR CRYPTOCOMPARE API TO GET HISTORICAL DATA TO AVOID ANALYSIS DELAY
+
+
+     */
 
     private Double getPrice(String name){
         JSONObject obj = null;
@@ -144,7 +153,7 @@ public class AnalyseMarkets {
 
     private JSONArray getCCJSON(String name){
         try{
-            URL url = new URL("https://min-api.cryptocompare.com/data/histohour?fsym="+name+"&tsym=BTC&limit=168&aggregate=1&e=CCCAGG");
+            URL url = new URL("https://min-api.cryptocompare.com/data/histominute?fsym="+name+"&tsym=BTC&limit=28&aggregate=5&e=CCCAGG");
             URLConnection urlConnection = url.openConnection();
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream(), "UTF8"));
 
