@@ -86,7 +86,7 @@ public class AnalyseMarkets {
             }
         };
 
-        final ScheduledFuture<?> dataHandler = scheduler.scheduleAtFixedRate(gatherData, 5, 5, TimeUnit.MINUTES);
+        final ScheduledFuture<?> dataHandler = scheduler.scheduleAtFixedRate(gatherData, 30, 30, TimeUnit.MINUTES);
     }
 
     /*
@@ -153,7 +153,7 @@ public class AnalyseMarkets {
 
     private JSONArray getCCJSON(String name){
         try{
-            URL url = new URL("https://min-api.cryptocompare.com/data/histominute?fsym="+name+"&tsym=BTC&limit=28&aggregate=5&e=CCCAGG");
+            URL url = new URL("https://min-api.cryptocompare.com/data/histominute?fsym="+name+"&tsym=BTC&limit=28&aggregate=30&e=CCCAGG");
             URLConnection urlConnection = url.openConnection();
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream(), "UTF8"));
 
